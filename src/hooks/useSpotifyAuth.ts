@@ -19,8 +19,8 @@ const base64encode = (input: ArrayBuffer) => {
     .replace(/\//g, '_');
 };
 
-const clientId = 'beed892e2d3c46188e5661a08a540c5d';
-const redirectUri = 'http://127.0.0.1:5173/';
+const clientId = import.meta.env.VITE_SPOTIFY_CLIENT_ID || 'beed892e2d3c46188e5661a08a540c5d';
+const redirectUri = import.meta.env.VITE_REDIRECT_URI || (window.location.origin + '/');
 const scope = 'user-top-read';
 const authUrl = new URL("https://accounts.spotify.com/authorize");
 const tokenUrl = "https://accounts.spotify.com/api/token";
