@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { useSpotifyAuth } from './hooks/useSpotifyAuth';
 import { useSpotifyData } from './hooks/useSpotifyData';
 import { Cosmos } from './components/Cosmos';

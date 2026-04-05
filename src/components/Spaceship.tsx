@@ -63,7 +63,7 @@ export const Spaceship: React.FC = () => {
     };
   }, []);
 
-  useFrame((state, delta) => {
+  useFrame((_state, delta) => {
     if (!shipRef.current || !chassisRef.current) return;
     
     // 1. Controls
