@@ -23,9 +23,22 @@ export const Planet: React.FC<PlanetProps> = ({ track, artist, index, starRadius
   // Reusable Vector3 to prevent Memory Leaks allocating variables every frame
   const globalPos = useMemo(() => new THREE.Vector3(), []);
 
-  // Use the pre-configured local audio mapping from useSpotifyData (universal for all artists)
-  const audioUrl = track.preview_url;
-  const playStartTime = useRef<number>(0);
+  // Map Taylor Swift local files directly to specific planets!
+  const isTaylor = artist.name.toLowerCase().includes("taylor swift");
+  const taylorClips: Record<string, string> = {
+    "Cruel Summer": "/songs/taylorswift/Cruel_Summer_hook.mp3",
+    "Anti-Hero": "/songs/taylorswift/Anti-Hero_hook.mp3",
+    "Blank Space": "/songs/taylorswift/Blank_Space_hook.mp3",
+    "Style": "/songs/taylorswift/Style_hook.mp3",
+    "Lover": "/songs/taylorswift/Lover_hook.mp3",
+    "Lavender Haze": "/songs/taylorswift/Lavender_Haze_hook.mp3",
+    "Karma": "/songs/taylorswift/Karma_hook.mp3",
+    "August": "/songs/taylorswift/August_hook.mp3",
+    "Love Story": "/songs/taylorswift/Love_Story_hook.mp3"
+  };
+  
+  // If we have an exact match for the planet's track name, assign it!
+  const audioUrl = isTaylor ? (taylorClips[track.name] || null) : null;
 
   // Orbit distance: evenly spaced from the star to avoid collisions
   const orbitRadius = starRadius + 4 + (index * 6);
@@ -71,26 +84,15 @@ export const Planet: React.FC<PlanetProps> = ({ track, artist, index, starRadius
         // Distance Culling (Performance vs. Crossfade)
         if (audioUrl && audioRef.current) {
            const cullingThreshold = 16.8;
-           const MIN_PLAY_MS = 5000;
-           const now = Date.now();
-           
-           const isOutOfRange = dist >= cullingThreshold;
-           const hasPlayedEnough = (now - playStartTime.current) >= MIN_PLAY_MS;
-
-           if (!isOutOfRange) {
+           if (dist < cullingThreshold) {
               if (!audioRef.current.isPlaying) {
                  audioRef.current.play();
-                 playStartTime.current = now;
                  playingAudios.set(track.id, { dist, ref: audioRef.current });
               } else {
                  const data = playingAudios.get(track.id);
                  if (data) data.dist = dist;
               }
-           }
-
-           // Manage Ducking & Stop logic
-           if (audioRef.current.isPlaying) {
-              // 1. Ducking calculation
+              
               let closestId = track.id;
               let minDist = dist;
               for (const [id, data] of playingAudios.entries()) {
@@ -106,16 +108,13 @@ export const Planet: React.FC<PlanetProps> = ({ track, artist, index, starRadius
               
               const isClosest = closestId === track.id;
               const hasCollision = playingAudios.size > 1;
-              const targetVolume = (hasCollision && !isClosest) ? 0.05 : 0.5;
+              const targetVolume = (hasCollision && !isClosest) ? 0.1 : 0.5;
               
-              // Smoothly transition volume
               audioRef.current.setVolume(THREE.MathUtils.lerp(audioRef.current.getVolume(), targetVolume, 0.05));
 
-              // 2. Stop condition: MUST be out of range AND must have played for at least 5 seconds
-              if (isOutOfRange && hasPlayedEnough) {
-                 audioRef.current.pause();
-                 playingAudios.delete(track.id);
-              }
+           } else if (dist >= cullingThreshold && audioRef.current.isPlaying) {
+              audioRef.current.pause();
+              playingAudios.delete(track.id);
            }
         }
      }
