@@ -19,26 +19,13 @@ interface PlanetProps {
 export const Planet: React.FC<PlanetProps> = ({ track, artist, index, starRadius }) => {
   const planetRef = useRef<THREE.Group>(null);
   const audioRef = useRef<THREE.PositionalAudio>(null);
+  const startTimeRef = useRef<number>(0);
   
   // Reusable Vector3 to prevent Memory Leaks allocating variables every frame
   const globalPos = useMemo(() => new THREE.Vector3(), []);
 
-  // Map Taylor Swift local files directly to specific planets!
-  const isTaylor = artist.name.toLowerCase().includes("taylor swift");
-  const taylorClips: Record<string, string> = {
-    "Cruel Summer": "/songs/taylorswift/Cruel_Summer_hook.mp3",
-    "Anti-Hero": "/songs/taylorswift/Anti-Hero_hook.mp3",
-    "Blank Space": "/songs/taylorswift/Blank_Space_hook.mp3",
-    "Style": "/songs/taylorswift/Style_hook.mp3",
-    "Lover": "/songs/taylorswift/Lover_hook.mp3",
-    "Lavender Haze": "/songs/taylorswift/Lavender_Haze_hook.mp3",
-    "Karma": "/songs/taylorswift/Karma_hook.mp3",
-    "August": "/songs/taylorswift/August_hook.mp3",
-    "Love Story": "/songs/taylorswift/Love_Story_hook.mp3"
-  };
-  
-  // If we have an exact match for the planet's track name, assign it!
-  const audioUrl = isTaylor ? (taylorClips[track.name] || null) : null;
+  // Use the directly provided preview URL from the data pipeline (supports all artists)
+  const audioUrl = track.preview_url;
 
   // Orbit distance: evenly spaced from the star to avoid collisions
   const orbitRadius = starRadius + 4 + (index * 6);
@@ -59,10 +46,10 @@ export const Planet: React.FC<PlanetProps> = ({ track, artist, index, starRadius
   }, [track.id]);
 
   // Update orbit dynamically at frame rate avoiding costly React renders!
-  useFrame((state) => {
+  useFrame((_state) => {
      if (planetRef.current) {
         // 1. Plot Position
-        const time = state.clock.getElapsedTime();
+        const time = _state.clock.getElapsedTime();
         const x = Math.cos((time * orbitSpeed) + initialAngle) * orbitRadius;
         const z = Math.sin((time * orbitSpeed) + initialAngle) * orbitRadius;
         planetRef.current.position.set(x, 0, z);
@@ -84,9 +71,12 @@ export const Planet: React.FC<PlanetProps> = ({ track, artist, index, starRadius
         // Distance Culling (Performance vs. Crossfade)
         if (audioUrl && audioRef.current) {
            const cullingThreshold = 16.8;
+           const isPlaying = audioRef.current.isPlaying;
+           
            if (dist < cullingThreshold) {
-              if (!audioRef.current.isPlaying) {
+              if (!isPlaying) {
                  audioRef.current.play();
+                 startTimeRef.current = Date.now(); // Record start time
                  playingAudios.set(track.id, { dist, ref: audioRef.current });
               } else {
                  const data = playingAudios.get(track.id);
@@ -112,9 +102,13 @@ export const Planet: React.FC<PlanetProps> = ({ track, artist, index, starRadius
               
               audioRef.current.setVolume(THREE.MathUtils.lerp(audioRef.current.getVolume(), targetVolume, 0.05));
 
-           } else if (dist >= cullingThreshold && audioRef.current.isPlaying) {
-              audioRef.current.pause();
-              playingAudios.delete(track.id);
+           } else if (dist >= cullingThreshold && isPlaying) {
+              // 5-Second Minimum Playback Check
+              const playTime = Date.now() - startTimeRef.current;
+              if (playTime >= 5000) {
+                  audioRef.current.pause();
+                  playingAudios.delete(track.id);
+              }
            }
         }
      }
